@@ -1,0 +1,104 @@
+= Distributed Task Scheduler
+
+Simple Distributed Task Scheduler using Redis.
+
+The application starts a web-server that exposes one REST API to schedule tasks that should get processed in the future:
+```
+POST 'http://localhost:8888/api/v1/schedule'
+
+Request:
+body -
+{
+  "time": 1640212236,
+  "type": "MY_TASK",
+  "input": {}
+}
+
+* time - Unix timestamps in seconds
+* type - Task type (see TaskType enum class)
+* input - Task input
+
+Response:
+status code - 200
+body -
+{
+  "id": "6874ba39-29d5-4c6e-aaae-a957e2e75423"
+}
+
+* id - task unique id
+```
+
+When the API is invoked, the task is added to a `sorted-set` with `time` as the `score`.
+
+"TaskSampler" responsible for polling tasks from that `sorted-set` and if it`s time to get processed,
+the task is removed from the `sorted-set` and added to another `list` that holds tasks to process now.
+
+"TaskProcessor" responsible for polling the tasks from that `list` and process them.
+
+Notes:
+
+* Distributed processing is achieved using redis-locks.
+* Vertx Verticles used to scale the number of samplers and processors easily.
+
+== Building
+
+To launch your tests:
+```
+./gradlew clean test
+```
+
+To package your application:
+```
+./gradlew clean assemble
+```
+
+To run your application:
+```
+./gradlew clean run
+```
+
+== How To
+
+To run Redis docker container
+```
+docker run --name my-redis -p 6379:6379 --restart always --detach redis
+```
+
+To open redis-cli in the container
+```
+docker exec -it my-redis redis-cli
+```
+
+To launch redis & app using docker compose
+```
+docker-compose up -d
+```
+
+=== Examples:
+
+*Print Message Task*
+
+Request:
+```
+curl --location --request POST 'http://localhost:8888/api/v1/schedule' \
+--header 'Content-Type: application/json' \
+--data-raw '{
+    "type": "PRINT_MESSAGE",
+    "time": 1640428140,
+    "input": {
+        "message": "hello world"
+    }
+}'
+```
+
+Result:
+```
+2021-12-25T10:29:00,194 [TaskProcessor-0] INFO  com.task_scheduler.task.impl.PrintMessageTask - "hello world"
+```
+
+
+=== Adding a new task:
+
+    1. Add your new type to "TaskType" enum.
+    2. Impl "TaskHandler" for that new type.
+    3. Add the new type to the "tasks" map in "TasksHandlerProvider" class.

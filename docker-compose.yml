@@ -1,0 +1,15 @@
+version: '3'
+services:
+  task-scheduler:
+    image: task-scheduler
+    build: .
+    ports:
+      - 8888:8888
+    environment:
+      - REDIS_CONNECTION=redis://redis:6379
+    depends_on:
+      - redis
+  redis:
+    image: redis
+    ports:
+      - 6379:6379
